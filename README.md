@@ -99,3 +99,8 @@ Repozytorium zawiera między innymi następujące katalogi:
 
 Projekt będzie rozwijany etapami w trakcie semestru.
 W kolejnych zajęciach repozytorium będzie rozszerzane o dodatkowe serwisy, integracje i mechanizmy bezpieczeństwa.
+
+### Lab03 
+
+Nawiązanie połączenie z brokerem oraz przesłano temperaturę z esp za pomocą mqtt, a następnie zweryfikowano poprawność 
+działania za pomocą aplikacji mqtt explorer
