@@ -1,4 +1,5 @@
 #include "secrets.h"
+#include "sensorsim.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
@@ -7,7 +8,14 @@ WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 String deviceId;
 String topic;
+struct seq_counter
+{
+    int temp = 0;
+    int humi = 0;
+    int press = 0;
+};
 
+struct seq_counter seq_c;
 
 String generateDeviceIdFromEfuse() {
   uint64_t chipId = ESP.getEfuseMac();
@@ -47,18 +55,26 @@ void connectMQTT() {
   }
 }
 
-void publishMeasurement() {
-  StaticJsonDocument<256> doc;
+long long getTimestampMs() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return ((long long)tv.tv_sec * 1000LL) + (tv.tv_usec / 1000);
+}
+
+void publishMeasurement(String name, float data, String unit, int seq) {
+  JsonDocument doc;
   doc["device_id"] = deviceId;
-  doc["sensor"] = "temperature";
-  doc["value"] = temperatureRead();
-  doc["unit"] = "C";
-  doc["ts_ms"] = millis();
+  doc["sensor"] = name;
+  doc["value"] = data;
+  doc["unit"] = unit;
+  doc["ts_ms"] = getTimestampMs();
+  doc["seq"] = seq;
   char payload[256];
   serializeJson(doc, payload);
-  mqttClient.publish(topic.c_str(), payload);
+  String full_topic = topic + name;
+  mqttClient.publish(full_topic.c_str(), payload);
   Serial.print("Publikacja na topic: ");
-  Serial.println(topic);
+  Serial.println(full_topic);
   Serial.println(payload);
 }
 
@@ -66,11 +82,19 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   deviceId = generateDeviceIdFromEfuse();
-  topic = "lab/" + String(MQTT_GROUP) + "/" + deviceId + "/temperature";
+  topic = "lab/" + String(MQTT_GROUP) + "/" + deviceId + "/";
   Serial.print("Device ID: ");
   Serial.println(deviceId);
   connectWiFi();
   connectMQTT();
+
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  struct tm timeinfo;
+  while (!getLocalTime(&timeinfo)) {
+    Serial.println("Oczekiwanie na synchronizacje czasu...");
+    delay(500);
+  }
+  Serial.println("Czas zsynchronizowany.");
 }
 
 void loop() {
@@ -80,7 +104,14 @@ void loop() {
   if (!mqttClient.connected()) {
     connectMQTT();
   }
+  float temp = sinsim(25.0, 5.0, 60.0);
+  float humidity = sinsim(55.0, 15.0, 90.0);
+  float pressure = sinsim(1010.0, 10.0, 120.0);
+
+  publishMeasurement("temperature", temp, "C", seq_c.temp++);
+  publishMeasurement("humidity", humidity, "%", seq_c.humi++);
+  publishMeasurement("pressure", pressure, "hPa", seq_c.press++);
+
   mqttClient.loop();
-  publishMeasurement();
   delay(5000);
 }

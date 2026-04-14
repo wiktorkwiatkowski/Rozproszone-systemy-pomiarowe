@@ -4,7 +4,7 @@ services:
       context: ./api
       dockerfile: Dockerfile
     ports:
-      - 5001:5001
+      - "5001:5001"
     image: api:v1
     container_name: api
   
@@ -13,7 +13,7 @@ services:
       context: ./broker
       dockerfile: Dockerfile
     ports: 
-      - 1883:1883
+      - "1883:1883"
     image: broker:v1
     container_name: broker
   
@@ -22,6 +22,15 @@ services:
       context: ./database
       dockerfile: Dockerfile
     ports:
-      - 5432:5432
+      - "5432:5432"
     image: database:v1
     container_name: postgres
+  
+  ingestor:
+    build:
+      context: ./ingestor
+      dockerfile: Dockerfile
+    container_name: ingestor
+    depends_on:
+      - broker
+      - database
